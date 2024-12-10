@@ -8,9 +8,25 @@ import io
 from efficientnet.keras import preprocess_input
 from tensorflow.keras.models import load_model
 from tensorflow.keras.utils import load_img, img_to_array
+from google.cloud import storage
+
+
+def download_model_from_gcs(bucket_name, model_path, local_path):
+    client = storage.Client()
+    bucket = client.get_bucket(bucket_name)
+    blob = bucket.blob(model_path)
+    blob.download_to_filename(local_path)
+    print(f"Model downloaded to {local_path}")
+
+# Unduh model saat aplikasi Flask berjalan
+MODEL_BUCKET_NAME = "model-ml-agrovision"
+model_path = "model.h5"
+local_model_path = "/tmp/model.h5"
+
 
 def load_models():
-    model1 = load_model("weights/model.h5")
+    download_model_from_gcs(MODEL_BUCKET_NAME, model_path, local_model_path)
+    model1 = load_model(local_model_path)
     print('model1 loading complete')
     
     return model1
