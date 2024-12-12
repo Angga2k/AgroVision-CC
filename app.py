@@ -6,6 +6,8 @@ from predict import *
 from google.cloud import storage
 import os
 import uuid
+import firebase_admin
+from firebase_admin import auth
 from werkzeug.utils import secure_filename
 
 model = load_models()
@@ -124,20 +126,29 @@ def save_prediction():
         if imagefile.filename == '':
             return jsonify({"error": "No selected file"}), 400
         
+        allowed_extensions = {'jpg', 'jpeg', 'png'}
+        if '.' not in imagefile.filename or imagefile.filename.rsplit('.', 1)[1].lower() not in allowed_extensions:
+            return jsonify({'error': 'Invalid file extension'}), 400
+        
         # Mengunggah file ke Google Cloud Storage
         image_url = upload_to_gcs(imagefile, BUCKET_NAME)
         
+        # Mendapatkan ID Token dari pengguna yang login
+        user_uid = None
+        if 'Authorization' in request.headers:
+            id_token = request.headers['Authorization'].split('Bearer ')[1]
+            user_uid = get_user_uid_from_id_token(id_token)  # Fungsi untuk mengambil user UID
+        
         # Mengambil data lainnya dari form-data
-        user_id = request.form.get('user_id')
         result = request.form.get('result')
 
-        if not user_id or not result:
+        if not user_uid or not result:
             return jsonify({"error": "Missing user_id or result"}), 400
         
         # Menyimpan data ke Firestore
         prediction_id = predictions_collection.document().id
         predictions_collection.document(prediction_id).set({
-            'user_id': user_id,
+            'user_id': user_uid,
             'result': result,
             'date': firestore.SERVER_TIMESTAMP,
             'image_url': image_url
@@ -147,11 +158,28 @@ def save_prediction():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+def get_user_uid_from_id_token(id_token):
+    # Inisialisasi Firebase Admin SDK
+
+    # Jika Firebase Admin SDK belum diinisialisasi
+    if not firebase_admin._apps:
+        firebase_admin.initialize_app()
+
+    # Ambil user ID dari ID Token
+    decoded_token = auth.verify_id_token(id_token)
+    return decoded_token['uid']
+
+
 # Endpoint untuk Mendapatkan Riwayat Prediksi
-@app.route('/get-predictions/<user_id>', methods=['GET'])
-def get_predictions(user_id):
+@app.route('/get-predictions/', methods=['GET'])
+def get_predictions():
     try:
-        predictions = predictions_collection.where('user_id', '==', user_id).stream()
+        user_uid = None
+        if 'Authorization' in request.headers:
+            id_token = request.headers['Authorization'].split('Bearer ')[1]
+            user_uid = get_user_uid_from_id_token(id_token)  # Fungsi untuk mengambil user UID
+            
+        predictions = predictions_collection.where('user_id', '==', user_uid).stream()
         results = [
             {'prediction_id': pred.id, **pred.to_dict()} for pred in predictions
         ]

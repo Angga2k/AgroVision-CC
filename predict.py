@@ -25,8 +25,8 @@ local_model_path = "/tmp/model.h5"
 
 
 def load_models():
-    download_model_from_gcs(MODEL_BUCKET_NAME, model_path, local_model_path)
-    model1 = load_model(local_model_path)
+    # download_model_from_gcs(MODEL_BUCKET_NAME, model_path, local_model_path)
+    model1 = load_model('./weights/model.h5')
     print('model1 loading complete')
     
     return model1
