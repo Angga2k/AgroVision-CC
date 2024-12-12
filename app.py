@@ -179,13 +179,31 @@ def get_predictions():
             id_token = request.headers['Authorization'].split('Bearer ')[1]
             user_uid = get_user_uid_from_id_token(id_token)  # Fungsi untuk mengambil user UID
             
+        if user_uid == None:
+            return jsonify({"status" : "error",
+                            "message" : "please login first"
+                            })
+            
         predictions = predictions_collection.where('user_id', '==', user_uid).stream()
         results = [
             {'prediction_id': pred.id, **pred.to_dict()} for pred in predictions
         ]
-        return jsonify(results), 200
+        
+        if not results:
+            return jsonify({
+                "status": "success",
+                "data": []
+            }), 200
+        
+        return jsonify({
+            "status": "success",
+            "data": results
+        }), 200
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+            return jsonify({
+                "status": "error",
+                "message": str(e)
+            }), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8080)
