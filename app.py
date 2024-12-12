@@ -105,11 +105,16 @@ def predictions():
     allowed_extensions = {'jpg', 'jpeg', 'png'}
     if '.' not in imagefile.filename or imagefile.filename.rsplit('.', 1)[1].lower() not in allowed_extensions:
         return jsonify({'error': 'Invalid file extension'}), 400
+    
+    class_prediction = ["Alternaria Alternata", "Cercospora Nicotianae", "Healthy"]
 
     # Proses file image langsung tanpa menyimpannya
     result, prediction = main(imagefile, model)
-    hasil = f'{result} {prediction:.2f}%'
-    return jsonify({'diagnose': hasil}), 200
+    response_data = {
+        "accuracy": float(prediction), 
+        "class": class_prediction[int(result)]
+    }
+    return jsonify(response_data), 200
 
 
 @app.route('/save-prediction', methods=['POST'])
@@ -141,6 +146,7 @@ def save_prediction():
         
         # Mengambil data lainnya dari form-data
         result = request.form.get('result')
+        accuracy = request.form.get('accuracy')
 
         if not user_uid or not result:
             return jsonify({"error": "Missing user_id or result"}), 400
@@ -150,6 +156,7 @@ def save_prediction():
         predictions_collection.document(prediction_id).set({
             'user_id': user_uid,
             'result': result,
+            'accuracy' : accuracy,
             'date': firestore.SERVER_TIMESTAMP,
             'image_url': image_url
         })
